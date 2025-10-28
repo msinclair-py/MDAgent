@@ -23,20 +23,26 @@ class Builder(Agent):
     async def build(
         self,
         path: Path,
+        pdb: Path,
         build_kwargs: dict[str, Any],
     ) -> Path:
         solvent = build_kwargs.get('solvent', 'implicit')
 
-        if solvent == 'implicit':
-            keys = set(inspect.signature(self.implicit).parameters)
-            kwargs = {k: build_kwargs[k] for k in in build_kwargs if k in keys}
+        match solvent:
+            case 'implicit':
+                keys = set(inspect.signature(self.implicit).parameters)
+                kwargs = {k: build_kwargs[k] for k in build_kwargs if k in keys}
 
-            builder = self.implicit(path, **kwargs)
-        else:
-            keys = set(inspect.signature(self.explicit).parameters)
-            kwargs = {k: build_kwargs[k] for k in in build_kwargs if k in keys}
+                builder = self.implicit(path=path, pdb=pdb, **kwargs)
 
-            builder = self.explicit(path, **build_kwargs)
+            case 'explicit':
+                keys = set(inspect.signature(self.explicit).parameters)
+                kwargs = {k: build_kwargs[k] for k in build_kwargs if k in keys}
+
+                builder = self.explicit(path=path, pdb=pdb, **kwargs)
+
+            case _:
+                raise ValueError('Something terrible happened!')
 
         builder.build()
 
@@ -58,16 +64,22 @@ class MDSimulator(Agent):
         sim_kwargs: dict[str, Any],
     ) -> Path:
         solvent = sim_kwargs.get('solvent', 'implicit')
-        if solvent == 'implicit':
-            keys = set(inspect.signature(self.implicit).parameters)
-            kwargs = {k: sim_kwargs[k] for k in in sim_kwargs if k in keys}
 
-            simulator = self.implicit(path, **sim_kwargs)
-        else:
-            keys = set(inspect.signature(self.explicit).parameters)
-            kwargs = {k: sim_kwargs[k] for k in in sim_kwargs if k in keys}
+        match solvent:
+            case 'implicit':
+                keys = set(inspect.signature(self.implicit).parameters)
+                kwargs = {k: sim_kwargs[k] for k in sim_kwargs if k in keys}
 
-            simulator = self.explicit(path, **sim_kwargs)
+                simulator = self.implicit(path, **kwargs)
+            
+            case 'explicit':
+                keys = set(inspect.signature(self.explicit).parameters)
+                kwargs = {k: sim_kwargs[k] for k in sim_kwargs if k in keys}
+
+                simulator = self.explicit(path, **kwargs)
+            
+            case _:
+                raise ValueError('Something terrible happened!')
 
         simulator.run()
 
@@ -86,10 +98,11 @@ class MDCoordinator(Agent):
     @action
     async def build_system(
         self,
+        path: Path,
         structural_input: Path,
         build_kwargs: dict[str, Any]
     ) -> Path:
-        return self.builder.build(structural_input, build_kwargs)
+        return await self.builder.build(path, structural_input, build_kwargs)
 
     @action
     async def run_simulation(
@@ -97,16 +110,19 @@ class MDCoordinator(Agent):
         simulation_path: Path,
         sim_kwargs: dict[str, Any]
     ) -> Path:
-        return self.simulator.simulate(simulation_path, sim_kwargs)
+        return await self.simulator.simulate(simulation_path, sim_kwargs)
 
     @action
     async def deploy_md(
         self,
+        path: Path,
         initial_pdb: Path,
         build_kwargs: dict[str, Any],
         sim_kwargs: dict[str, Any],
     ) -> dict[str, Any]:
-        path = await self.build_system(initial_pdb, build_kwargs)
+        logger.info(f'Building system at: {path}')
+        path = await self.build_system(path, initial_pdb, build_kwargs)
+        logger.info(f'Successfully built system. Simulating!')
         await self.run_simulation(path, sim_kwargs)
 
         return {'build': path,

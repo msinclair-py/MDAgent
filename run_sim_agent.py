@@ -10,16 +10,16 @@ from pathlib import Path
 async def main():
     init_logging('INFO')
 
-    cwd = Path.cwd() / 'test_sim'
+    cwd = Path.cwd() / 'test_expl'
     cwd.mkdir(exist_ok=True)
 
-    input_pdb = '1UBQ.pdb'
-    solvent = 'implicit'
+    input_pdb = Path('data/1ubq.pdb').resolve()
+    solvent = 'explicit'
 
     build_kwargs = {
         'solvent': solvent,
         'protein': True,
-        'amberhome': os.environ['AMBERHOME'],
+        'out': 'system.pdb'
     }
     
     sim_kwargs = {
@@ -46,9 +46,13 @@ async def main():
         )
 
         results = await coordinator.deploy_md(
+            cwd,
             input_pdb,
             build_kwargs,
             sim_kwargs,
         )
 
         print(results)
+
+if __name__ == '__main__':
+    asyncio.run(main())
