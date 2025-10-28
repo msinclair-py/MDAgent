@@ -5,6 +5,7 @@ import inspect
 import logging
 from molecular_simulations.build import ImplicitSolvent, ExplicitSolvent
 from molecular_simulations.simulate import ImplicitSimulator, Simulator
+from molecular_simulations.simulate.mmpbsa import MMPBSA
 from pathlib import Path
 from typing import Any
 
@@ -85,15 +86,34 @@ class MDSimulator(Agent):
 
         return simulator.path
 
+class FreeEnergy(Agent):
+    def __init__(
+        self,
+        calculator: object=MMPBSA
+    ) -> None:
+        self.calculator = calculator
+
+    @action
+    async def measure(
+        self,
+        fe_kwargs: dict[str, Any],
+    ) -> float:
+        mmpbsa = MMPBSA(**fe_kwargs)
+
+        return mmpbsa.run()
+
+
 class MDCoordinator(Agent):
     def __init__(
         self, 
         builder: Handle[Builder], 
-        simulator: Handle[MDSimulator]
+        simulator: Handle[MDSimulator],
+        free_energy: Handle[FreeEnergy],
     ) -> None:
         super().__init__()
         self.builder = builder
         self.simulator = simulator
+        self.free_energy = free_energy
 
     @action
     async def build_system(
@@ -113,17 +133,32 @@ class MDCoordinator(Agent):
         return await self.simulator.simulate(simulation_path, sim_kwargs)
 
     @action
+    async def run_mmpbsa(
+        self,
+        fe_kwargs: dict[str, Any]
+    ) -> float:
+        return await self.free_energy.measure(fe_kwargs)
+
+    @action
     async def deploy_md(
         self,
         path: Path,
         initial_pdb: Path,
         build_kwargs: dict[str, Any],
         sim_kwargs: dict[str, Any],
+        fe_kwargs: dict[str, Any]
     ) -> dict[str, Any]:
         logger.info(f'Building system at: {path}')
         path = await self.build_system(path, initial_pdb, build_kwargs)
         logger.info(f'Successfully built system. Simulating!')
         await self.run_simulation(path, sim_kwargs)
+
+        logger.info('Computing free energy with MM-PBSA!')
+        fe_kwargs.update({
+            'top': path / 'system.prmtop',
+            'dcd': path / 'prod.dcd'
+        })
+        await self.run_mmpbsa(fe_kwargs)
 
         return {'build': path,
                 'sim': 'success'}
