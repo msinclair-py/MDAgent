@@ -3,7 +3,7 @@ from academy.logging import init_logging
 from academy.manager import Manager
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-from MDAgent.core.agents_parsl import Builder, MDSimulator, FreeEnergy, MDCoordinator
+from MDAgent.core.agents_parsl_fixed import Builder, MDSimulator, FreeEnergy, MDCoordinator
 import os
 import parsl
 from parsl import Config, HighThroughputExecutor
@@ -46,7 +46,7 @@ async def main():
 
     build_kwargss = [build_kwargs for _ in range(4)]
     sim_kwargss = [sim_kwargs for _ in range(4)]
-    fe_kwargss = [fe_kwargs for _ in range(4)]
+    fe_kwargss = [fe_kwargs.copy() for _ in range(4)]
 
     parsl_config = Config(
         executors=[

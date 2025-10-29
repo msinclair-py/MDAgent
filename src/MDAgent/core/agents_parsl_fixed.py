@@ -12,29 +12,57 @@ from pathlib import Path
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
+
+# Parsl apps that directly execute the simulation tasks
+# These run in separate processes/threads and don't use the Agent framework
+@python_app
+def parsl_build(path: Path, pdb: Path, build_kwargs: dict[str, Any]) -> Path:
+    """Execute build task directly in Parsl worker."""
+    from molecular_simulations.build import ImplicitSolvent, ExplicitSolvent
     
-@python_app(cache=False)
-def deploy_task(call: Callable,
-                args: list[Any]=[]) -> Any:
-    future = call(*args)
-    return future
+    solvent = build_kwargs.get('solvent', 'implicit')
+    
+    if solvent == 'implicit':
+        builder = ImplicitSolvent(path=path, pdb=pdb, 
+                                  protein=build_kwargs.get('protein', True),
+                                  out=build_kwargs.get('out', 'system.pdb'))
+    else:  # explicit
+        builder = ExplicitSolvent(path=path, pdb=pdb,
+                                  protein=build_kwargs.get('protein', True),
+                                  out=build_kwargs.get('out', 'system.pdb'))
+    
+    builder.build()
+    return builder.out.parent
 
-@python_app(cache=False)
-def deploy_build(builder: Agent,
-                 args: list[Any]):
-    builder.build(*args)
+@python_app
+def parsl_simulate(path: Path, sim_kwargs: dict[str, Any]) -> Path:
+    """Execute simulation task directly in Parsl worker."""
+    from molecular_simulations.simulate import ImplicitSimulator, Simulator
+    
+    solvent = sim_kwargs.get('solvent', 'implicit')
+    
+    if solvent == 'implicit':
+        simulator = ImplicitSimulator(path, 
+                                      equil_steps=sim_kwargs.get('equil_steps', 10000),
+                                      prod_steps=sim_kwargs.get('prod_steps', 100000))
+    else:  # explicit
+        simulator = Simulator(path,
+                             equil_steps=sim_kwargs.get('equil_steps', 10000),
+                             prod_steps=sim_kwargs.get('prod_steps', 100000))
+    
+    simulator.run()
+    return simulator.path
 
-@python_app(cache=False)
-def deploy_sim(sim: Agent,
-               args: list[Any]):
-    sim.simulate(*args)
-
-@python_app(cache=False)
-def deploy_mmpbsa(mmpbsa: Agent,
-                  args: list[Any]):
-    mmpbsa.measure(*args)
+@python_app
+def parsl_mmpbsa(fe_kwargs: dict[str, Any]) -> float:
+    """Execute MMPBSA calculation directly in Parsl worker."""
+    from molecular_simulations.simulate.mmpbsa import MMPBSA
+    
+    mmpbsa = MMPBSA(**fe_kwargs)
+    return mmpbsa.run()
 
 def appfuture_to_async(app_fut) -> asyncio.Future:
+    """Convert a Parsl AppFuture to an asyncio Future."""
     loop = asyncio.get_running_loop()
     afut = loop.create_future()
 
@@ -49,6 +77,7 @@ def appfuture_to_async(app_fut) -> asyncio.Future:
     return afut
 
 class Builder(Agent):
+    """Agent wrapper for building - not used in Parsl execution."""
     def __init__(
         self,
         implicit: object=ImplicitSolvent,
@@ -64,29 +93,29 @@ class Builder(Agent):
         pdb: Path,
         build_kwargs: dict[str, Any],
     ) -> Path:
+        # This method is not used in Parsl mode
+        # Parsl uses parsl_build directly
         solvent = build_kwargs.get('solvent', 'implicit')
 
         match solvent:
             case 'implicit':
                 keys = set(inspect.signature(self.implicit).parameters)
                 kwargs = {k: build_kwargs[k] for k in build_kwargs if k in keys}
-
                 builder = self.implicit(path=path, pdb=pdb, **kwargs)
 
             case 'explicit':
                 keys = set(inspect.signature(self.explicit).parameters)
                 kwargs = {k: build_kwargs[k] for k in build_kwargs if k in keys}
-
                 builder = self.explicit(path=path, pdb=pdb, **kwargs)
 
             case _:
                 raise ValueError('Something terrible happened!')
 
         builder.build()
-
         return builder.out.parent
 
 class MDSimulator(Agent):
+    """Agent wrapper for simulation - not used in Parsl execution."""
     def __init__(
         self,
         implicit: object=ImplicitSimulator,
@@ -101,29 +130,29 @@ class MDSimulator(Agent):
         path: Path,
         sim_kwargs: dict[str, Any],
     ) -> Path:
+        # This method is not used in Parsl mode
+        # Parsl uses parsl_simulate directly
         solvent = sim_kwargs.get('solvent', 'implicit')
 
         match solvent:
             case 'implicit':
                 keys = set(inspect.signature(self.implicit).parameters)
                 kwargs = {k: sim_kwargs[k] for k in sim_kwargs if k in keys}
-
                 simulator = self.implicit(path, **kwargs)
             
             case 'explicit':
                 keys = set(inspect.signature(self.explicit).parameters)
                 kwargs = {k: sim_kwargs[k] for k in sim_kwargs if k in keys}
-
                 simulator = self.explicit(path, **kwargs)
             
             case _:
                 raise ValueError('Something terrible happened!')
 
         simulator.run()
-
         return simulator.path
 
 class FreeEnergy(Agent):
+    """Agent wrapper for free energy - not used in Parsl execution."""
     def __init__(
         self,
         calculator: object=MMPBSA
@@ -135,12 +164,14 @@ class FreeEnergy(Agent):
         self,
         fe_kwargs: dict[str, Any],
     ) -> float:
+        # This method is not used in Parsl mode
+        # Parsl uses parsl_mmpbsa directly
         mmpbsa = MMPBSA(**fe_kwargs)
-
         return mmpbsa.run()
 
 
 class MDCoordinator(Agent):
+    """Coordinator that orchestrates Parsl tasks."""
     def __init__(
         self, 
         builder: Handle[Builder], 
@@ -152,8 +183,8 @@ class MDCoordinator(Agent):
         self.builder = builder
         self.simulator = simulator
         self.free_energy = free_energy
-
         self.config = parsl_config
+        self.dfk = None
 
     async def agent_on_startup(self) -> None:
         """Initialize Parsl on agent startup."""
@@ -168,7 +199,6 @@ class MDCoordinator(Agent):
             self.dfk = None
         parsl.clear()
 
-
     @action
     async def build_system(
         self,
@@ -176,11 +206,15 @@ class MDCoordinator(Agent):
         structural_inputs: list[Path],
         build_kwargss: list[dict[str, Any]]
     ) -> list[Path]:
+        """Submit build tasks to Parsl and wait for completion."""
         futures = []
-        for args in zip(paths, structural_inputs, build_kwargss):
-            futures.append(asyncio.wrap_future(deploy_build(self.builder, args)))
+        for path, pdb, build_kwargs in zip(paths, structural_inputs, build_kwargss):
+            # Call the Parsl app directly, not through the Agent
+            app_future = parsl_build(path, pdb, build_kwargs)
+            futures.append(app_future)
 
-        async_futures = [appfuture_to_async(f) for f in futures]
+        # Convert Parsl futures to async futures and wait
+        async_futures = [asyncio.wrap_future(f) for f in futures]
         return await asyncio.gather(*async_futures)
 
     @action
@@ -188,23 +222,33 @@ class MDCoordinator(Agent):
         self,
         simulation_paths: list[Path],
         sim_kwargss: list[dict[str, Any]]
-    ) -> Path:
+    ) -> list[Path]:
+        """Submit simulation tasks to Parsl and wait for completion."""
         futures = []
-        for args in zip(simulation_paths, sim_kwargss):
-            futures.append(asyncio.wrap_future(deploy_sim(self.simulator, args)))
+        for path, sim_kwargs in zip(simulation_paths, sim_kwargss):
+            # Call the Parsl app directly
+            app_future = parsl_simulate(path, sim_kwargs)
+            futures.append(app_future)
         
-        async_futures = [appfuture_to_async(f) for f in futures]
-        return await asyncio.gather(*futures)
+        # Convert and wait
+        async_futures = [asyncio.wrap_future(f) for f in futures]
+        return await asyncio.gather(*async_futures)
 
     @action
     async def run_mmpbsa(
         self,
         fe_kwargss: list[dict[str, Any]]
-    ) -> float:
-        futures = [asyncio.wrap_future(deploy_mmpbsa(self.free_energy, fe_kwargs)) for fe_kwargs in fe_kwargss]
-        async_futures = [appfuture_to_async(f) for f in futures]
+    ) -> list[float]:
+        """Submit MMPBSA tasks to Parsl and wait for completion."""
+        futures = []
+        for fe_kwargs in fe_kwargss:
+            # Call the Parsl app directly
+            app_future = parsl_mmpbsa(fe_kwargs)
+            futures.append(app_future)
 
-        return await asyncio.gather(*futures)
+        # Convert and wait
+        async_futures = [asyncio.wrap_future(f) for f in futures]
+        return await asyncio.gather(*async_futures)
 
     @action
     async def deploy_md(
@@ -214,21 +258,24 @@ class MDCoordinator(Agent):
         build_kwargss: list[dict[str, Any]],
         sim_kwargss: list[dict[str, Any]],
         fe_kwargss: list[dict[str, Any]]
-    ) -> dict[str, Any]:
+    ) -> list[dict[str, Any]]:
+        """Deploy full MD workflow using Parsl."""
         logger.info(f'Building systems at: {paths}')
-        await self.build_system(paths, initial_pdbs, build_kwargss)
+        built_paths = await self.build_system(paths, initial_pdbs, build_kwargss)
         
-        logger.info(f'Successfully built system. Simulating!')
-        await self.run_simulation(paths, sim_kwargss)
+        logger.info(f'Successfully built systems. Simulating at: {built_paths}')
+        sim_paths = await self.run_simulation(built_paths, sim_kwargss)
 
         logger.info('Computing free energy with MM-PBSA!')
-        for path, fe_kwargs in zip(paths, fe_kwargss):
+        # Update fe_kwargs with paths from simulations
+        for path, fe_kwargs in zip(sim_paths, fe_kwargss):
+            logger.info(f'Will run at: {path}')
             fe_kwargs.update({
                 'top': path / 'system.prmtop',
                 'dcd': path / 'prod.dcd'
             })
 
-        await self.run_mmpbsa(fe_kwargss)
+        fe_results = await self.run_mmpbsa(fe_kwargss)
 
-        return [{'build': path,
-                 'sim': 'success'} for path in paths]
+        return [{'build': path, 'sim': 'success', 'free_energy': fe} 
+                for path, fe in zip(paths, fe_results)]
