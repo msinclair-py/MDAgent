@@ -1,2 +1,5 @@
 test_*/
+trial_*/
 __pycache__/
+*.log
+*.json
