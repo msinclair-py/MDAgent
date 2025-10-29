@@ -10,7 +10,7 @@ from pathlib import Path
 async def main():
     init_logging('INFO')
 
-    cwd = Path.cwd() / 'test_mmpbsa2'
+    cwd = Path.cwd() / 'test_mmpbsa3'
     cwd.mkdir(exist_ok=True)
 
     input_pdb = Path('data/barnase_barnstar.pdb').resolve()
@@ -31,7 +31,7 @@ async def main():
     fe_kwargs = {
         'selections': [':1-110', ':111-200'],
         'n_cpus': 64,
-        'amberhome': Path(os.environ['AMBERHOME']) / 'bin'
+        'amberhome': Path(os.environ['AMBERHOME'])
     }
 
     async with await Manager.from_exchange_factory(
