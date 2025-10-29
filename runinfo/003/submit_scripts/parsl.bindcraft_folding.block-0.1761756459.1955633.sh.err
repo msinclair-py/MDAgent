@@ -1,2 +1,0 @@
-/eagle/projects/FoundEpidem/msinclair/conda_envs/simagent/lib/python3.12/multiprocessing/resource_tracker.py:279: UserWarning: resource_tracker: There appear to be 7 leaked semaphore objects to clean up at shutdown
-  warnings.warn('resource_tracker: There appear to be %d '
