@@ -14,11 +14,39 @@ from typing import Any, Callable
 logger = logging.getLogger(__name__)
     
 @python_app
-def deploy_task(self,
-                call: Callable,
+def deploy_task(call: Callable,
                 args: list[Any]=[]) -> Any:
     future = call(*args)
     return future
+
+@python_app
+def deploy_build(builder: Agent,
+                 args: list[Any]):
+    builder.build(*args)
+
+@python_app
+def deploy_sim(sim: Agent,
+               args: list[Any]):
+    sim.simulate(*args)
+
+@python_app
+def deploy_mmpbsa(mmpbsa: Agent,
+                  args: list[Any]):
+    mmpbsa.measure(*args)
+
+def appfuture_to_async(app_fut) -> asyncio.Future:
+    loop = asyncio.get_running_loop()
+    afut = loop.create_future()
+
+    def _done(parsl_fut):
+        try:
+            res = parsl_fut.result()
+            loop.call_soon_threadsafe(afut.set_result, res)
+        except Exception as e:
+            loop.call_soon_threadsafe(afut.set_exception, e)
+
+    app_fut.add_done_callback(_done)
+    return afut
 
 class Builder(Agent):
     def __init__(
@@ -150,9 +178,10 @@ class MDCoordinator(Agent):
     ) -> list[Path]:
         futures = []
         for args in zip(paths, structural_inputs, build_kwargss):
-            futures.append(asyncio.wrap_future(deploy_task(self.builder.build, args)))
+            futures.append(asyncio.wrap_future(deploy_build(self.builder, args)))
 
-        return await asyncio.gather(*futures)
+        async_futures = [appfuture_to_async(f) for f in futures]
+        return await asyncio.gather(*async_futures)
 
     @action
     async def run_simulation(
@@ -162,8 +191,9 @@ class MDCoordinator(Agent):
     ) -> Path:
         futures = []
         for args in zip(simulation_paths, sim_kwargss):
-            futures.append(asyncio.wrap_future(deploy_task(self.simulator.simulate, args)))
-
+            futures.append(asyncio.wrap_future(deploy_sim(self.simulator, args)))
+        
+        async_futures = [appfuture_to_async(f) for f in futures]
         return await asyncio.gather(*futures)
 
     @action
@@ -171,7 +201,8 @@ class MDCoordinator(Agent):
         self,
         fe_kwargss: list[dict[str, Any]]
     ) -> float:
-        futures = [asyncio.wrap_future(deploy_task(self.free_energy.measure, fe_kwargs)) for fe_kwargs in fe_kwargss]
+        futures = [asyncio.wrap_future(deploy_mmpbsa(self.free_energy, fe_kwargs)) for fe_kwargs in fe_kwargss]
+        async_futures = [appfuture_to_async(f) for f in futures]
 
         return await asyncio.gather(*futures)
 
@@ -185,7 +216,7 @@ class MDCoordinator(Agent):
         fe_kwargss: list[dict[str, Any]]
     ) -> dict[str, Any]:
         logger.info(f'Building systems at: {paths}')
-        paths = await self.build_system(paths, initial_pdbs, build_kwargss)
+        await self.build_system(paths, initial_pdbs, build_kwargss)
         
         logger.info(f'Successfully built system. Simulating!')
         await self.run_simulation(paths, sim_kwargss)

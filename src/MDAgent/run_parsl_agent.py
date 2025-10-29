@@ -1,9 +1,9 @@
 from academy.exchange import LocalExchangeFactory
 from academy.logging import init_logging
 from academy.manager import Manager
-from agents_parsl import Builder, MDSimulator, FreeEnergy, MDCoordinator
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from MDAgent.core.agents_parsl import Builder, MDSimulator, FreeEnergy, MDCoordinator
 import os
 import parsl
 from parsl import Config, HighThroughputExecutor
@@ -51,7 +51,7 @@ async def main():
     parsl_config = Config(
         executors=[
             HighThroughputExecutor(
-                label='bindcraft_folding',
+                label='agentic_MD',
                 cores_per_worker=4,
                 worker_debug=True,
                 provider=LocalProvider(parallelism=1, max_blocks=4),
