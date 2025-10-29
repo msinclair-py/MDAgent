@@ -12,6 +12,13 @@ from pathlib import Path
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
+    
+@python_app
+def deploy_task(self,
+                call: Callable,
+                args: list[Any]=[]) -> Any:
+    future = call(*args)
+    return future
 
 class Builder(Agent):
     def __init__(
@@ -133,12 +140,6 @@ class MDCoordinator(Agent):
             self.dfk = None
         parsl.clear()
 
-    @python_app
-    def deploy(self,
-               call: Callable,
-               args: list[Any]=[]) -> Any:
-        future = call(*args, **kwargs)
-        return future
 
     @action
     async def build_system(
@@ -149,7 +150,7 @@ class MDCoordinator(Agent):
     ) -> list[Path]:
         futures = []
         for args in zip(paths, structural_inputs, build_kwargss):
-            futures.append(asyncio.wrap_future(self.deploy(self.builder.build, args)))
+            futures.append(asyncio.wrap_future(deploy_task(self.builder.build, args)))
 
         return await asyncio.gather(*futures)
 
@@ -161,7 +162,7 @@ class MDCoordinator(Agent):
     ) -> Path:
         futures = []
         for args in zip(simulation_paths, sim_kwargss):
-            futures.append(asyncio.wrap_future(self.deploy(self.simulator.simulate, args)))
+            futures.append(asyncio.wrap_future(deploy_task(self.simulator.simulate, args)))
 
         return await asyncio.gather(*futures)
 
@@ -170,7 +171,7 @@ class MDCoordinator(Agent):
         self,
         fe_kwargss: list[dict[str, Any]]
     ) -> float:
-        futures = [asyncio.wrap_future(self.deploy(self.free_energy.measure, fe_kwargs)) for fe_kwargs in fe_kwargss]
+        futures = [asyncio.wrap_future(deploy_task(self.free_energy.measure, fe_kwargs)) for fe_kwargs in fe_kwargss]
 
         return await asyncio.gather(*futures)
 
