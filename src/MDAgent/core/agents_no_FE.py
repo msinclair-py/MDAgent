@@ -24,12 +24,10 @@ def parsl_build(path: Path, pdb: Path, build_kwargs: dict[str, Any]) -> Path:
     
     if solvent == 'implicit':
         builder = ImplicitSolvent(path=path, pdb=pdb, 
-                                  protein=build_kwargs.get('protein', True),
-                                  out=build_kwargs.get('out', 'system.pdb'))
+                                  **build_kwargs)
     else:  # explicit
         builder = ExplicitSolvent(path=path, pdb=pdb,
-                                  protein=build_kwargs.get('protein', True),
-                                  out=build_kwargs.get('out', 'system.pdb'))
+                                  **build_kwargs)
     
     builder.build()
     return builder.out.parent
@@ -43,12 +41,10 @@ def parsl_simulate(path: Path, sim_kwargs: dict[str, Any]) -> Path:
     
     if solvent == 'implicit':
         simulator = ImplicitSimulator(path, 
-                                      equil_steps=sim_kwargs.get('equil_steps', 10000),
-                                      prod_steps=sim_kwargs.get('prod_steps', 100000))
+                                      **sim_kwargs)
     else:  # explicit
         simulator = Simulator(path,
-                             equil_steps=sim_kwargs.get('equil_steps', 10000),
-                             prod_steps=sim_kwargs.get('prod_steps', 100000))
+                              **sim_kwargs)
     
     simulator.run()
     return simulator.path
@@ -228,4 +224,4 @@ class MDCoordinator(Agent):
         logger.info(f'Successfully built systems. Simulating at: {built_paths}')
         sim_paths = await self.run_simulation(built_paths, sim_kwargss)
 
-        return [{'build': path, 'sim': 'success'} for path paths]
+        return [{'build': path, 'sim': 'success'} for path in paths]
