@@ -184,6 +184,7 @@ class MDCoordinator(Agent):
         """Submit build tasks to Parsl and wait for completion."""
         futures = []
         for path, pdb, build_kwargs in zip(paths, structural_inputs, build_kwargss):
+            print(path, pdb, build_kwargs)
             # Call the Parsl app directly, not through the Agent
             app_future = parsl_build(path, pdb, build_kwargs)
             futures.append(app_future)
