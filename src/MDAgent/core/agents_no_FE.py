@@ -38,6 +38,7 @@ def parsl_simulate(path: Path, sim_kwargs: dict[str, Any]) -> Path:
     from molecular_simulations.simulate import ImplicitSimulator, Simulator
     
     solvent = sim_kwargs.get('solvent', 'implicit')
+    del sim_kwargs['solvent'] # not actually a kwarg of simulator
     
     if solvent == 'implicit':
         simulator = ImplicitSimulator(path, 

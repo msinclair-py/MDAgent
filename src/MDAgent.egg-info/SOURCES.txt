@@ -7,5 +7,7 @@ src/MDAgent.egg-info/SOURCES.txt
 src/MDAgent.egg-info/dependency_links.txt
 src/MDAgent.egg-info/top_level.txt
 src/MDAgent/core/agents.py
+src/MDAgent/core/agents_no_FE.py
 src/MDAgent/core/agents_parsl.py
 src/MDAgent/core/agents_parsl_fixed.py
+src/MDAgent/core/mmpbsa_agent.py

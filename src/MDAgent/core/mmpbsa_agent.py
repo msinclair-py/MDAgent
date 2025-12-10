@@ -18,8 +18,17 @@ def parsl_mmpbsa(fe_kwargs: dict[str, Any]) -> float:
     """Execute MMPBSA calculation directly in Parsl worker."""
     from molecular_simulations.simulate.mmpbsa import MMPBSA
     
-    mmpbsa = MMPBSA(**fe_kwargs)
-    return mmpbsa.run()
+    path = fe_kwargs['dcd'].parent
+
+    try:
+        mmpbsa = MMPBSA(**fe_kwargs)
+        mmpbsa.run()
+        fe = mmpbsa.free_energy
+    except Exception as e:
+        logger.warn(f'MMPBSA for {path} failed: {e}')
+        fe = None
+    
+    return {'path': path, 'success': fe is not None, 'fe': fe}
 
 class FreeEnergy(Agent):
     """Agent wrapper for free energy - not used in Parsl execution."""
@@ -36,7 +45,7 @@ class FreeEnergy(Agent):
     ) -> float:
         # This method is not used in Parsl mode
         # Parsl uses parsl_mmpbsa directly
-        mmpbsa = MMPBSA(**fe_kwargs)
+        mmpbsa = self.calculator(**fe_kwargs)
         return mmpbsa.run()
 
 
@@ -44,11 +53,9 @@ class FECoordinator(Agent):
     """Coordinator that orchestrates Parsl tasks."""
     def __init__(
         self, 
-        free_energy: Handle[FreeEnergy],
         parsl_config: Config,
     ) -> None:
         super().__init__()
-        self.free_energy = free_energy
         self.config = parsl_config
         self.dfk = None
 
@@ -75,11 +82,9 @@ class FECoordinator(Agent):
         for fe_kwargs in fe_kwargss:
             # Call the Parsl app directly
             app_future = parsl_mmpbsa(fe_kwargs)
-            futures.append(app_future)
+            futures.append(asyncio.wrap_future(app_future))
 
-        # Convert and wait
-        async_futures = [asyncio.wrap_future(f) for f in futures]
-        return await asyncio.gather(*async_futures)
+        return await asyncio.gather(*futures)
 
     @action
     async def deploy(
@@ -89,6 +94,7 @@ class FECoordinator(Agent):
     ) -> list[dict[str, Any]]:
         """Deploy full MD workflow using Parsl."""
         logger.info('Computing free energy with MM-PBSA!')
+        futures = []
         # Update fe_kwargs with paths from simulations
         for path, fe_kwargs in zip(paths, fe_kwargss):
             logger.info(f'Will run at: {path}')
@@ -97,6 +103,6 @@ class FECoordinator(Agent):
                 'dcd': path / 'prod.dcd'
             })
 
-        fe_results = await self.run_mmpbsa(fe_kwargss)
+            futures.append(asyncio.wrap_future(parsl_mmpbsa(fe_kwargs)))
 
-        return [{'status': 'success', 'free_energy': fe} for fe in fe_results]
+        return await asyncio.gather(*futures)
