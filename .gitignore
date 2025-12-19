@@ -4,3 +4,4 @@ runinfo/
 __pycache__/
 *.log
 *.json
+data/
