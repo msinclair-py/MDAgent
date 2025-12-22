@@ -169,7 +169,7 @@ def advanced_simulation_workflow(paths: list[Path],
     for resid, freq in summary.items():
         summary[resid] = freq / len(paths)
 
-    return {'advanced_simulation_analysis': {'summary': summary, 'contact_data': analysis}}
+    return {'advanced_simulation_analysis': {'summary': summary, 'raw': analysis}}
 
 def basic_static_workflow(paths: list[Path],
                           distance_cutoff: float=8.0) -> dict[str, Any]:
