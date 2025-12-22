@@ -19,8 +19,8 @@ def contact_frequency(topology: Path,
     resids_A = chainA.resids
     resids_B = chainB.resids
 
-    contact_counts_A = defaultdict(int)
-    contact_counts_B = defaultdict(int)
+    contact_counts_A = defaultdict(int, {resid: 0. for resid in resids_A})
+    contact_counts_B = defaultdict(int, {resid: 0. for resid in resids_B})
 
     n_frames = u.trajectory.n_frames
 

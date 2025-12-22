@@ -139,8 +139,8 @@ def matt_workflow(path, chain_of_interest):
 def advanced_simulation_workflow(paths: list[Path],
                                  distance_cutoff: float=8.0,
                                  n_top: int=10,
-                                 top_file: Optional[None]=None,
-                                 traj_file: Optional[None]=None) -> dict[str, Any]:
+                                 top_file: Optional[str]=None,
+                                 traj_file: Optional[str]=None) -> dict[str, Any]:
     if top_file is None:
         top_file = 'system.prmtop'
     
@@ -148,6 +148,7 @@ def advanced_simulation_workflow(paths: list[Path],
         traj_file = 'prod.dcd'
 
     analysis = {}
+    summary = {}
     for i, path in enumerate(paths):
         top = path / top_file
         traj = path / traj_file
@@ -161,10 +162,28 @@ def advanced_simulation_workflow(paths: list[Path],
             'contact_frequencies_B': freq_B,
         }
 
-    return {'advanced_simulation_analysis': analysis}
+        if summary:
+            for resid, freq in freq_A:
+                summary[resid] += freq
 
-def basic_static_workflow():
-    pass
+    for resid, freq in summary.items():
+        summary[resid] = freq / len(paths)
+
+    return {'advanced_simulation_analysis': {'summary': summary, 'contact_data': analysis}}
+
+def basic_static_workflow(paths: list[Path],
+                          distance_cutoff: float=8.0) -> dict[str, Any]:
+    analysis = {}
+    for i, path in enumerate(paths):
+        u = mda.Universe(str(path))
+        sel = u.select_atoms(f'(name CA and chainID A) and around {distance_cutoff} (name CA and chainID B)')
+
+        analysis[i] = {
+            'path': path,
+            'contacts': sel.residues.resids
+        }
+
+    return {'basic_structure_analysis': analysis}
 
 def advanced_static_workflow():
     pass
