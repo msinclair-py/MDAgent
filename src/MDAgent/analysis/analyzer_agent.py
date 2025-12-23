@@ -19,9 +19,9 @@ def parsl_static(_type: str, arguments: dict[str, Any]) -> dict[str, Any]:
 
     match _type:
         case 'basic':
-            result = basic_static_workflow(arguments['paths'])
+            result = basic_static_workflow(arguments['paths'], **arguments['kwargs'])
         case 'advanced':
-            result = advanced_static_workflow(arguments['paths'], arguments['kwargs'])
+            result = advanced_static_workflow(arguments['paths'], **arguments['kwargs'])
         case _:
             logger.warning(f'Analysis type {_type} not implemented!')
             result = None
@@ -35,9 +35,9 @@ def parsl_dynamic(analysis: dict[str, Any]) -> dict[str, Any]:
     
     match _type:
         case 'basic':
-            result = basic_simulation_workflow(arguments['paths'])
+            result = basic_simulation_workflow(arguments['paths'], **arguments['kwargs'])
         case 'advanced':
-            result = advanced_simulation_workflow(arguments['paths'], arguments['kwargs'])
+            result = advanced_simulation_workflow(arguments['paths'], **arguments['kwargs'])
         case _:
             logger.warning(f'Analysis type {_type} not implemented!')
             result = None

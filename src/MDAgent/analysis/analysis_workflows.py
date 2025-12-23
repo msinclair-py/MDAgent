@@ -17,7 +17,8 @@ from .funcs import contact_frequency, population_statistics
 
 def basic_simulation_workflow(paths: list[Path], 
                               top_file: Optional[str]=None,
-                              traj_file: Optional[str]=None) -> dict[int, Any]:
+                              traj_file: Optional[str]=None,
+                              **kwargs) -> dict[int, Any]:
     import mdtraj as md
 
     if top_file is None:
@@ -140,7 +141,8 @@ def advanced_simulation_workflow(paths: list[Path],
                                  distance_cutoff: float=8.0,
                                  n_top: int=10,
                                  top_file: Optional[str]=None,
-                                 traj_file: Optional[str]=None) -> dict[str, Any]:
+                                 traj_file: Optional[str]=None,
+                                 **kwargs) -> dict[str, Any]:
     if top_file is None:
         top_file = 'system.prmtop'
     
@@ -172,7 +174,8 @@ def advanced_simulation_workflow(paths: list[Path],
     return {'advanced_simulation_analysis': {'summary': summary, 'raw': analysis}}
 
 def basic_static_workflow(paths: list[Path],
-                          distance_cutoff: float=8.0) -> dict[str, Any]:
+                          distance_cutoff: float=8.0,
+                          **kwargs) -> dict[str, Any]:
     analysis = {}
     for i, path in enumerate(paths):
         u = mda.Universe(str(path))
@@ -185,6 +188,7 @@ def basic_static_workflow(paths: list[Path],
 
     return {'basic_structure_analysis': analysis}
 
-def advanced_static_workflow():
+def advanced_static_workflow(paths: list[Path],
+                             **kwargs) -> None:
     pass
 
