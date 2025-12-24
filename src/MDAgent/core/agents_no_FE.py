@@ -226,4 +226,4 @@ class MDCoordinator(Agent):
         logger.info(f'Successfully built systems. Simulating at: {built_paths}')
         sim_paths = await self.run_simulation(built_paths, sim_kwargss)
 
-        return [{'build': path, 'sim': 'success'} for path in paths]
+        return paths
