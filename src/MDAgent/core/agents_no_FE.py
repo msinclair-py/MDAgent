@@ -29,8 +29,11 @@ def parsl_build(path: Path, pdb: Path, build_kwargs: dict[str, Any]) -> Path:
         builder = ExplicitSolvent(path=path, pdb=pdb,
                                   **build_kwargs)
     
-    builder.build()
-    return builder.out.parent
+    try:
+        builder.build()
+        return builder.out.parent
+    except Exception as e:
+        return ''
 
 @python_app
 def parsl_simulate(path: Path, sim_kwargs: dict[str, Any]) -> Path:
@@ -195,7 +198,8 @@ class MDCoordinator(Agent):
 
         # Convert Parsl futures to async futures and wait
         async_futures = [asyncio.wrap_future(f) for f in futures]
-        return await asyncio.gather(*async_futures)
+        paths = await asyncio.gather(*async_futures)
+        return [path for path in paths if path]
 
     @action
     async def run_simulation(
@@ -212,7 +216,8 @@ class MDCoordinator(Agent):
         
         # Convert and wait
         async_futures = [asyncio.wrap_future(f) for f in futures]
-        return await asyncio.gather(*async_futures)
+        paths = await asyncio.gather(*async_futures)
+        return [path for path in paths if path]
 
     @action
     async def deploy_md(
@@ -229,4 +234,4 @@ class MDCoordinator(Agent):
         logger.info(f'Successfully built systems. Simulating at: {built_paths}')
         sim_paths = await self.run_simulation(built_paths, sim_kwargss)
 
-        return [path for path in sim_paths if path]
+        return sim_paths
