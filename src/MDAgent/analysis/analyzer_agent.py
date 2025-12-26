@@ -70,7 +70,7 @@ class AnalysisCoordinator(Agent):
     @action
     async def analyze(
         self,
-        analysis_plan: dict[str, Any]:
+        analysis_plan: dict[str, Any],
     ) -> list[dict[str, Any]]:
         """Deploy full analysis workflow using Parsl.
         Input structure should be as follows:
@@ -113,10 +113,10 @@ class AnalysisCoordinator(Agent):
         if dynamic_analyses:
             futures = []
             for _type, arguments in dynamic_analyses.items():
-                futures.append(asyncio.wrap_future(parsl_static(_type, arguments)))
+                futures.append(asyncio.wrap_future(parsl_dynamic(_type, arguments)))
 
             dynamic += await asyncio.gather(*futures)
-            dynamic = dict(ChainMap(*dict))
+            dynamic = dict(ChainMap(*dynamic))
         else:
             dynamic = None
         
