@@ -2,7 +2,7 @@ from collections import defaultdict
 import MDAnalysis as mda
 from MDAnalysis.analysis.contacts import contact_matrix
 from MDAnalysis.analysis.distances import distance_array
-from MDAnalysis.analysis.rms import rmsd, rmsf
+from MDAnalysis.analysis.rms import rmsd, RMSF
 from molecular_simulations.analysis import (
     ipSAE,
     DynamicInteractionEnergy,
