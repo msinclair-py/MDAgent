@@ -29,7 +29,7 @@ def parsl_static(_type: str, arguments: dict[str, Any]) -> dict[str, Any]:
     return result
 
 @python_app
-def parsl_dynamic(analysis: dict[str, Any]) -> dict[str, Any]:
+def parsl_dynamic(analysis: dict[str, Any], arguments: dict[str, Any]) -> dict[str, Any]:
     """Execute simulation task directly in Parsl worker."""
     from .analysis_workflows import basic_simulation_workflow, advanced_simulation_workflow
     
