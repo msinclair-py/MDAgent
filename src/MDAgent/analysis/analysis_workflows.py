@@ -96,6 +96,9 @@ def basic_simulation_workflow(paths: list[Path],
 
         stable_threshold = result['rmsf']['mean'] - 0.5 * result['rmsf']['std']
         stable_residues = np.where(rmsf < stable_threshold)[0].tolist()
+        
+        n_flexible = kwargs.get('n_flexible', 10)
+        n_stable = kwargs.get('n_stable', 10)
 
         result['flexibility_analysis'] = {
             'flexible_residues': flexible_residues[:n_flexible],
