@@ -169,10 +169,10 @@ def advanced_simulation_workflow(paths: list[Path],
         }
 
         if summary:
-            for resid, freq in freq_A:
+            for resid, freq in freq_A.items():
                 summary[resid] += freq
         else:
-            for resid, freq in freq_A:
+            for resid, freq in freq_A.items():
                 summary[resid] = freq
 
     for resid, freq in summary.items():
