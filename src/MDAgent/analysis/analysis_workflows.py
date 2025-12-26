@@ -171,6 +171,9 @@ def advanced_simulation_workflow(paths: list[Path],
         if summary:
             for resid, freq in freq_A:
                 summary[resid] += freq
+        else:
+            for resid, freq in freq_A:
+                summary[resid] = freq
 
     for resid, freq in summary.items():
         summary[resid] = freq / len(paths)
