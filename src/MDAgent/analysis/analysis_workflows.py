@@ -28,7 +28,7 @@ def basic_simulation_workflow(paths: list[Path],
     if traj_file is None:
         traj_file = 'prod.dcd'
     
-    N = len(inp)
+    N = len(paths)
     rmsds = np.zeros((N, 3))
     rmsfs = np.zeros((N, 3))
     rogs = np.zeros((N, 3))
