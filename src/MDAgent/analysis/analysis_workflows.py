@@ -14,6 +14,7 @@ import numpy as np
 from pathlib import Path
 from rust_simulation_tools import kabsch_align
 from .funcs import contact_frequency, population_statistics
+from typing import Optional
 
 def basic_simulation_workflow(paths: list[Path], 
                               top_file: Optional[str]=None,
