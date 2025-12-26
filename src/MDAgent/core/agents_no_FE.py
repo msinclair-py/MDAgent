@@ -47,8 +47,11 @@ def parsl_simulate(path: Path, sim_kwargs: dict[str, Any]) -> Path:
         simulator = Simulator(path,
                               **sim_kwargs)
     
-    simulator.run()
-    return simulator.path
+    try:
+        simulator.run()
+        return simulator.path
+    except Exception as e:
+        return ''
 
 @python_app
 def parsl_mmpbsa(fe_kwargs: dict[str, Any]) -> float:
@@ -226,4 +229,4 @@ class MDCoordinator(Agent):
         logger.info(f'Successfully built systems. Simulating at: {built_paths}')
         sim_paths = await self.run_simulation(built_paths, sim_kwargss)
 
-        return paths
+        return [path for path in sim_paths if path]
