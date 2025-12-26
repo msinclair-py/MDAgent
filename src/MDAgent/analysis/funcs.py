@@ -9,7 +9,7 @@ def contact_frequency(topology: Path,
                       trajectory: Path,
                       distance_cutoff: float=8.0,
                       n_top: int=10) -> tuple[list, list, dict, dict]:
-    u = mda.Universe(str(path / top_file), str(path / traj_file))
+    u = mda.Universe(str(topology), str(trajectory))
     u = assign_chainids(u)
 
     
